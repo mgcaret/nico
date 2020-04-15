@@ -70,7 +70,8 @@ func getDebugInterface(device string) debugInterfaceFunc {
 			BaudRate:        debugSpeed,
 			DataBits:        8,
 			StopBits:        1,
-			MinimumReadSize: 1,
+			MinimumReadSize: 0,
+			InterCharacterTimeout: 1000,
 		}
 		deviceReadWriter, err = serial.Open(options)
 		if err != nil {
@@ -304,7 +305,7 @@ CmdSwitch:
 				debugWriteCmd(rw, 0x2AAA, 0x55)
 				debugWriteCmd(rw, 0x5555, 0xA0)
 				debugWriteCmd(rw, uint(segAddr+uint32(idx))&0xFFFF, uint(dat))
-				debugCmdWait(20)
+				//debugCmdWait(20) // probably not needed
 			}
 			debugOutputChan <- "Segment complete!\n"
 		}
@@ -321,6 +322,26 @@ CmdSwitch:
 	case "erase":
 		debugEraseChip(rw, 0x20)
 		debugOutputChan <- "Flash ROM erased!\n"
+	case "chipid":
+		id0, id1 := debugChipID(rw, 0x20)
+		debugOutputChan <- "Manufacturer: "
+		switch id0 {
+		case 0xBF:
+			debugOutputChan <- "SST, device: "
+			switch id1 {
+			case 0xD5:
+				debugOutputChan <- "39xF010 (128K)\n"
+			case 0xD6:
+				debugOutputChan <- "39xF020 (256K)\n"
+			case 0xD7:
+				debugOutputChan <- "39xF040 (512K)\n"
+			default:
+				debugOutputChan <- fmt.Sprintf("0x%02X\n", id1)
+			}
+		default:
+			debugOutputChan <- fmt.Sprintf("0x%02X, device: 0x%02X\n", id0, id1)
+
+		}
 	default:
 		debugOutputChan <- fmt.Sprintf("Unknown command: '%s'\n", words[0])
 	}
@@ -370,12 +391,14 @@ func debugReadByte(rw io.ReadWriter) uint {
 	_, err := rw.Read(buf)
 	if err != nil {
 		debugOutputChan <- fmt.Sprintf("Error reading from debug device: %v\n", err)
+	} else {
+		i, err := strconv.ParseUint(string(buf), 16, 8)
+		if err != nil {
+			debugOutputChan <- fmt.Sprintf("Error parsing data from debug device: %v\n", err)
+		}
+		return uint(i)
 	}
-	i, err := strconv.ParseUint(string(buf), 16, 8)
-	if err != nil {
-		debugOutputChan <- fmt.Sprintf("Error parsing data from debug device: %v\n", err)
-	}
-	return uint(i)
+	return 0
 }
 
 func debugEraseChip(rw io.ReadWriter, bank uint) {
@@ -392,4 +415,46 @@ func debugEraseChip(rw io.ReadWriter, bank uint) {
 	debugWriteCmd(rw, 0x2AAA, 0x55)
 	debugWriteCmd(rw, 0x5555, 0x10)
 	debugCmdWait(100000)
+}
+
+func debugEraseSector(rw io.ReadWriter, sa uint) {
+	// Stop
+	debugWriteChars(rw, "]")
+	// Send bank of flash chip
+	debugWriteHex(rw, (sa >> 16) & 0xF0, 2)
+	debugWriteChars(rw, ":")
+	// Erase sector
+	debugWriteCmd(rw, 0x5555, 0xAA)
+	debugWriteCmd(rw, 0x2AAA, 0x55)
+	debugWriteCmd(rw, 0x5555, 0x80)
+	debugWriteCmd(rw, 0x5555, 0xAA)
+	debugWriteCmd(rw, 0x2AAA, 0x55)
+	debugWriteHex(rw, sa >> 16, 2)
+	debugWriteChars(rw, ":")
+	debugWriteCmd(rw, sa & 0xFFFF, 0x30)
+	debugCmdWait(50000)
+}
+
+func debugChipID(rw io.ReadWriter, bank uint) (uint, uint) {
+	// Stop
+	debugWriteChars(rw, "]")
+	// Send bank of flash chip
+	debugWriteHex(rw, bank, 2)
+	debugWriteChars(rw, ":")
+	// Software ID mode enter
+	debugWriteCmd(rw, 0x5555, 0xAA)
+	debugWriteCmd(rw, 0x2AAA, 0x55)
+	debugWriteCmd(rw, 0x5555, 0x90)
+	// Now read the ID bytes
+	debugWriteHex(rw, 0, 4)
+	debugWriteChars(rw, "#")
+	debugWriteChars(rw, "@")
+	id0 := debugReadByte(rw)
+	debugWriteChars(rw, "@")
+	id1 := debugReadByte(rw)
+	// Software ID mode exit
+	debugWriteCmd(rw, 0x5555, 0xAA)
+	debugWriteCmd(rw, 0x2AAA, 0x55)
+	debugWriteCmd(rw, 0x5555, 0xF0)
+	return id0, id1
 }

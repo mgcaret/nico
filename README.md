@@ -99,6 +99,8 @@ Lenore Byron's ``neonprog`` distributed for the Neon816.
 
 ``verify <hex-file>`` - verify programmed Intel hex file
 
+``chipid`` - identify the flash ROM chip (stops CPU, use cont or go to resume)
+
 ``flash <hex-file>`` - Erase ROM and flash with Intel Hex file data
 
 ``erase`` - Erase ROM.
@@ -127,7 +129,7 @@ interface, it will send it through to the Neon816.
 
 If ``debug-device`` was specified:
 
-*Alt+S - send 'stop' command
+*Alt+S* - send 'stop' command
 
 *Alt+Space* - send 'step' command.
 
@@ -162,11 +164,20 @@ if in the middle, clear to the right of the cursor.
 
 *Alt+F* - go forward a word
 
-*Ctrl+Y*, *Alt+Enter* - copy the send the current contents of the debug input
+*Ctrl+Y*, *Alt+Enter* - send the current contents of the debug input
 to ``console-device`` and clear the input.
 
-*Alt+Y* - copy the send the current contents of the debug input
+*Alt+Y* - send the current contents of the debug input
 to ``console-device`` and leave the input untouched.
+
+## Bugs and Caveats
+
+The debug interface sometimes gets confused if you power off and then
+on the Neon816 when port is open.  This manifests as many errors being
+reported, or data from read being out of known alignment (often by
+1/2 byte).
+
+Nico sometimes exits and leaves the terminal in raw mode.
 
 
  

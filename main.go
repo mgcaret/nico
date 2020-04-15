@@ -58,10 +58,10 @@ func main() {
 		log.Fatal("init:", err)
 	}
 	defer func() {
-		goncurses.End()
-		if exitReason != "" {
-			log.Fatal(exitReason)
+		if !goncurses.IsEnd() {
+			goncurses.End()
 		}
+		log.Println(exitReason)
 	}()
 	goncurses.NewLines(false)
 	goncurses.Echo(false)
@@ -88,6 +88,9 @@ func main() {
 	commandInputWindow.Refresh()
 	// at this point, nobody must make Curses calls outside of uiServicer
 	mainApp()
+	if !goncurses.IsEnd() {
+		goncurses.End()
+	}
 }
 
 // Start all main goroutines and wait for one of them to tell us to quit
