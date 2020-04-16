@@ -59,9 +59,12 @@ func main() {
 	}
 	defer func() {
 		if !goncurses.IsEnd() {
+			goncurses.Raw(false)
 			goncurses.End()
 		}
-		log.Println(exitReason)
+		if exitReason != "" {
+			log.Println(exitReason)
+		}
 	}()
 	goncurses.NewLines(false)
 	goncurses.Echo(false)
@@ -89,6 +92,7 @@ func main() {
 	// at this point, nobody must make Curses calls outside of uiServicer
 	mainApp()
 	if !goncurses.IsEnd() {
+		goncurses.Raw(false)
 		goncurses.End()
 	}
 }
