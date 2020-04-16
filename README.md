@@ -35,13 +35,13 @@ binary.
 
 **MacOS X Users:**  When using Homebrew's ``ncurses``, note the following:
 
-*With ``github.com/rthornton128/goncurses``:*  Installing the library and building Nico may fail,
-if it does set ``LIBRARY_PATH``, e.g.:
+*With ``github.com/rthornton128/goncurses``:*  Installing the library and
+building Nico may fail, if it does set ``LIBRARY_PATH``, e.g.:
 
 ``export LIBRARY_PATH=/usr/local/Cellar/ncurses/6.2/lib``
 
-*With ``github.com/gbin/goncurses``:*  Installing the library and building Nico may fail,
-if it does set ``PKG_CONFIG_PATH``, e.g.:
+*With ``github.com/gbin/goncurses``:*  Installing the library and building
+Nico may fail, if it does set ``PKG_CONFIG_PATH``, e.g.:
 
 ``export PKG_CONFIG_PATH=/usr/local/Cellar/ncurses/6.2/lib/pkgconfig``
 
@@ -74,7 +74,7 @@ following keystrokes or sequences: Alt+Tab, F2, or ^] then Tab.
 
 The ANSI terminal interface sends each character typed to the
 ``console-device``, and displays characters and control sequences
-that it receives from the terminal device
+that it receives from the ``console-device``.
 
 ### The Debug/Command Interface
 
@@ -112,13 +112,19 @@ Lenore Byron's ``neonprog`` distributed for the Neon816.
 
 ``verify <hex-file>`` - verify programmed Intel hex file
 
-``chipid`` - identify the flash ROM chip (stops CPU, use cont or go to resume)
+``chipid`` - identify the flash ROM chip (stops CPU, use cont or go to
+resume)
 
 ``flash <hex-file>`` - Erase ROM and flash with Intel Hex file data
 
 ``erase`` - Erase ROM.
 
 ### Keyboard Shortcuts
+
+**Note:** Your system or terminal program may intercept some key combinations
+listed below.  In many cases, multiple combinations perform the same function
+so you should be able to find one that works if you cannot reconfigure the
+intercepting software.
 
 #### Accepted everywhere
 
@@ -190,7 +196,5 @@ on the Neon816 when port is open.  This manifests as many errors being
 reported, or data from read being out of known alignment (often by
 1/2 byte).
 
-Nico sometimes exits and leaves the terminal in raw mode.
-
-
- 
+Nico sometimes exits and leaves the terminal in raw mode.  Unix/Linux
+systems provide the ``reset`` command to fix this.
