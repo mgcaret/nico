@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/gbin/goncurses"
+	"github.com/rthornton128/goncurses"
 	"strconv"
 	"strings"
 )

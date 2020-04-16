@@ -22,7 +22,8 @@ Nico is a Curses-based terminal program written in Go.
 
 You will need Go and the the following libraries:
 
-* ``github.com/gbin/goncurses``
+* ``github.com/rthornton128/goncurses``
+  * Alternatively, ``github.com/gbin/goncurses`` (it is older)
 * ``github.com/jacobsa/go-serial/serial``
 * ``github.com/marcinbor85/gohex``
 
@@ -31,6 +32,18 @@ headers/libraries for NCurses and its dependencies.
 
 ``go build`` in the project directory should give you a ``nico``
 binary.
+
+**MacOS X Users:**  When using Homebrew's ``ncurses``, note the following:
+
+*With ``github.com/rthornton128/goncurses``:*  Installing the library and building Nico may fail,
+if it does set ``LIBRARY_PATH``, e.g.:
+
+``export LIBRARY_PATH=/usr/local/Cellar/ncurses/6.2/lib``
+
+*With ``github.com/gbin/goncurses``:*  Installing the library and building Nico may fail,
+if it does set ``PKG_CONFIG_PATH``, e.g.:
+
+``export PKG_CONFIG_PATH=/usr/local/Cellar/ncurses/6.2/lib/pkgconfig``
 
 ## Operation
 
