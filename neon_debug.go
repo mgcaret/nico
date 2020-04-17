@@ -277,12 +277,13 @@ CmdSwitch:
 			debugOutputChan <- fmt.Sprintf("Could not parse %s: %v\n", args[0], err)
 			break
 		}
-		debugWriteChars(rw, "]R")
 		if program {
+			debugWriteChars(rw, "]R")
 			debugOutputChan <- "Erasing chip...\n"
 			debugEraseChip(rw, 0x20)
 			debugOutputChan <- "Flashing...\n"
 		} else {
+			debugWriteChars(rw, "]")
 			debugOutputChan <- "Verifying...\n"
 		}
 		for segNum, segment := range mem.GetDataSegments() {

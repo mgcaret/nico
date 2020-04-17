@@ -212,6 +212,9 @@ to ``console-device`` and leave the input untouched.
 
 ## Bugs and Caveats
 
+Nico doesn't currently support resizing its window.  If you do, things
+might get weird.
+
 The debug interface sometimes gets confused if you power off and then
 on the Neon816 when port is open.  This manifests as many errors being
 reported, or data from read being out of known alignment (often by
