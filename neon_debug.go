@@ -85,6 +85,7 @@ func getDebugInterface(device string) debugInterfaceFunc {
 	}
 	debugOutputChan <- fmt.Sprintf("Connected to debugger at %s\n", device)
 	return func() {
+		debugResync(deviceReadWriter)
 		for {
 			select {
 			case words := <-debugCommandChan:
@@ -254,7 +255,8 @@ CmdSwitch:
 		} else {
 			debugOutputChan <- "Verify complete!\n"
 		}
-	case "flash":
+	case "flash", "verify-rom":
+		program := strings.ToLower(words[0]) == "flash"
 		args := words[1:]
 		if len(args) > 0 && args[0] == "" {
 			args = args[1:]
@@ -276,9 +278,13 @@ CmdSwitch:
 			break
 		}
 		debugWriteChars(rw, "]R")
-		debugOutputChan <- "Erasing chip...\n"
-		debugEraseChip(rw, 0x20)
-		debugOutputChan <- "Flashing...\n"
+		if program {
+			debugOutputChan <- "Erasing chip...\n"
+			debugEraseChip(rw, 0x20)
+			debugOutputChan <- "Flashing...\n"
+		} else {
+			debugOutputChan <- "Verifying...\n"
+		}
 		for segNum, segment := range mem.GetDataSegments() {
 			plural := "s"
 			if len(segment.Data) == 1 {
@@ -286,12 +292,21 @@ CmdSwitch:
 			}
 			// Force segments into flash address space
 			segAddr := 0x20_0000 | (segment.Address & 0x0F_FFFF)
+			if program {
+				debugOutputChan <- "Programming"
+			} else {
+				debugOutputChan <- "Verifying"
+			}
 			debugOutputChan <- fmt.Sprintf(
-				"Writing segment %v at 0x%08x, %v byte%s\n",
+				" segment %v at 0x%08x, %v byte%s\n",
 				segNum, segAddr, len(segment.Data),
 				plural)
 			debugWriteHex(rw, uint(segAddr>>16), 2)
 			debugWriteChars(rw, ":")
+			if !program {
+				debugWriteHex(rw, 0, 4)
+				debugWriteChars(rw, "#")
+			}
 			for idx, dat := range segment.Data {
 				if idx&0x7FF == 0 {
 					debugOutputChan <- fmt.Sprintf("%v%%\r", idx*100/len(segment.Data))
@@ -300,16 +315,38 @@ CmdSwitch:
 					// roll over to next bank
 					debugWriteHex(rw, uint(segAddr+uint32(idx))>>16, 2)
 					debugWriteChars(rw, ":")
+					if !program {
+						debugWriteHex(rw, 0, 4)
+						debugWriteChars(rw, "#")
+					}
 				}
-				debugWriteCmd(rw, 0x5555, 0xAA)
-				debugWriteCmd(rw, 0x2AAA, 0x55)
-				debugWriteCmd(rw, 0x5555, 0xA0)
-				debugWriteCmd(rw, uint(segAddr+uint32(idx))&0xFFFF, uint(dat))
-				//debugCmdWait(20) // probably not needed
+				if program {
+					// Since the erased chip is all 0xFF, we won't write those.
+					// This will speed up flashing.
+					if dat != 0xFF {
+						debugWriteCmd(rw, 0x5555, 0xAA)
+						debugWriteCmd(rw, 0x2AAA, 0x55)
+						debugWriteCmd(rw, 0x5555, 0xA0)
+						debugWriteCmd(rw, uint(segAddr+uint32(idx))&0xFFFF, uint(dat))
+						//debugCmdWait(20) // probably not needed
+					}
+				} else {
+					debugWriteChars(rw, "@")
+					b := debugReadByte(rw)
+					if b != uint(dat) {
+						debugOutputChan <- fmt.Sprintf("Validation failed at %08x!\n", segAddr+uint32(idx))
+						break CmdSwitch
+					}
+				}
 			}
 			debugOutputChan <- "Segment complete!\n"
 		}
-		debugOutputChan <- "Flash complete!\n"
+		if program {
+			debugOutputChan <- "Flash"
+		} else {
+			debugOutputChan <- "Verify"
+		}
+		debugOutputChan <- " complete!\n"
 	case "mapram":
 		debugWriteChars(rw, "]R")
 		debugWriteHex(rw, 0x08, 2)
@@ -340,8 +377,9 @@ CmdSwitch:
 			}
 		default:
 			debugOutputChan <- fmt.Sprintf("0x%02X, device: 0x%02X\n", id0, id1)
-
 		}
+	case "resync":
+		debugResync(rw)
 	default:
 		debugOutputChan <- fmt.Sprintf("Unknown command: '%s'\n", words[0])
 	}
@@ -457,4 +495,17 @@ func debugChipID(rw io.ReadWriter, bank uint) (uint, uint) {
 	debugWriteCmd(rw, 0x2AAA, 0x55)
 	debugWriteCmd(rw, 0x5555, 0xF0)
 	return id0, id1
+}
+
+func debugResync(rw io.ReadWriter) int {
+	buf := make([]byte, 16)
+	n, _ := rw.Read(buf)
+	if n > 0 {
+		plural := "s"
+		if n == 1 {
+			plural = ""
+		}
+		debugOutputChan <- fmt.Sprintf("Discarded %v byte%s from debug device.\n", n, plural)
+	}
+	return n
 }

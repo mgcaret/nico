@@ -23,27 +23,41 @@ Nico is a Curses-based terminal program written in Go.
 You will need Go and the the following libraries:
 
 * ``github.com/rthornton128/goncurses``
-  * Alternatively, ``github.com/gbin/goncurses`` (it is older)
+  * Alternatively, ``github.com/gbin/goncurses`` (it is older, and
+    you will have to edit the source code to use it)
 * ``github.com/jacobsa/go-serial/serial``
 * ``github.com/marcinbor85/gohex``
 
 Additionally you will need NCurses and the appropriate development 
 headers/libraries for NCurses and its dependencies.
 
-``go build`` in the project directory should give you a ``nico``
-binary.
+If everything is right, ``go build`` in the project directory should
+give you a ``nico`` binary.
 
-**MacOS X Users:**  When using Homebrew's ``ncurses``, note the following:
+Alternatively, you may try the ``build.sh`` script, which will build
+static binaries where supported, and will attempt to work around any
+of the caveats listed below.
 
-*With ``github.com/rthornton128/goncurses``:*  Installing the library and
-building Nico may fail, if it does set ``LIBRARY_PATH``, e.g.:
+### Build Caveats
+
+#### MacOS X
+
+When using Homebrew's ``ncurses``, installing the goncurses library
+and/or building Nico may fail in a couple of ways depending on which
+goncurses is in use:
+
+*With ``github.com/rthornton128/goncurses`` (the default):*  if
+installing goncurses or building Nico fails, set ``LIBRARY_PATH``, e.g.:
 
 ``export LIBRARY_PATH=/usr/local/Cellar/ncurses/6.2/lib``
 
-*With ``github.com/gbin/goncurses``:*  Installing the library and building
-Nico may fail, if it does set ``PKG_CONFIG_PATH``, e.g.:
+*With ``github.com/gbin/goncurses``:*  if installing goncurses or
+building Nico fails, set ``PKG_CONFIG_PATH``, e.g.:
 
 ``export PKG_CONFIG_PATH=/usr/local/Cellar/ncurses/6.2/lib/pkgconfig``
+
+The ``build.sh`` script attempts to automatically compile with the above
+variables set.
 
 ## Operation
 
@@ -80,7 +94,8 @@ that it receives from the ``console-device``.
 
 The debug/command interface accepts commands.  If ``debug-device``
 was specified, this includes all of the commands supported by
-Lenore Byron's ``neonprog`` distributed for the Neon816.
+Lenore Byron's ``neonprog`` distributed for the Neon816, plus
+some additional commands.
 
 #### Available Commands
 
@@ -92,7 +107,10 @@ Lenore Byron's ``neonprog`` distributed for the Neon816.
 
 ##### Commands available when ``debug-device`` was given
 
-``mapram`` - Map bank $80 RAM to bank $00
+``resync`` - discards bytes in the read buffer, use when commands
+like read return parse errors, or if you power-cycle your Neon.   
+
+``mapram`` - map bank $80 RAM to bank $00
 
 ``read <addr>...`` - read $40 bytes of memory at the given address(es)
 
@@ -115,7 +133,10 @@ Lenore Byron's ``neonprog`` distributed for the Neon816.
 ``chipid`` - identify the flash ROM chip (stops CPU, use cont or go to
 resume)
 
-``flash <hex-file>`` - Erase ROM and flash with Intel Hex file data
+``flash <hex-file>`` - Erase ROM and flash with Intel Hex file data,
+the addresses of the hex file are forced into the flash ROM range.
+
+``verify-rom <hex-file>`` - verify flashed Intel hex file
 
 ``erase`` - Erase ROM.
 
@@ -194,7 +215,7 @@ to ``console-device`` and leave the input untouched.
 The debug interface sometimes gets confused if you power off and then
 on the Neon816 when port is open.  This manifests as many errors being
 reported, or data from read being out of known alignment (often by
-1/2 byte).
+1/2 byte).  If this happes, execute the ``resync`` debug command. 
 
 Nico sometimes exits and leaves the terminal in raw mode.  Unix/Linux
 systems provide the ``reset`` command to fix this.
