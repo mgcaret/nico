@@ -1,5 +1,17 @@
 package main
 
+// ANSI terminal emulation stuff
+
+// ANSI is more or less close to the VT100 protocol
+
+// references:
+// http://www.termsys.demon.co.uk/vtansi.htm
+// http://ascii-table.com/ansi-escape-sequences.php
+// https://en.wikipedia.org/wiki/ANSI_escape_code
+// https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/c327.html
+// IEEE 1275-1994
+
+
 import (
 	"fmt"
 	"github.com/rthornton128/goncurses"
@@ -13,6 +25,9 @@ const (
 	csi1
 )
 
+// foreground color translation
+// note that -1 is "terminal default" and may not be supported
+// if it is not, it is replaced by C_WHITE
 var colorTransFG = [9]int16{
 	goncurses.C_BLACK,
 	goncurses.C_RED,
@@ -25,6 +40,9 @@ var colorTransFG = [9]int16{
 	-1,
 }
 
+// background color translation
+// note that -1 is "terminal default" and may not be supported
+// if it is not, it is replaced by C_BLACK
 var colorTransBG = [9]int16{
 	goncurses.C_BLACK,
 	goncurses.C_RED,
@@ -44,6 +62,8 @@ var (
 	ansiParms     map[int]int      // ANSI escape sequence parameters
 	ansiParmCount int              // ANSI escape parameter count
 	ansiEaten     string      = "" // ANSI parameter accumulated chars
+	savex         = 0			   // Saved cursor position X
+	savey         = 0              // Saved cursor position Y
 )
 
 // Set up the color mapping from ANSI colors to Curses colors
@@ -71,6 +91,7 @@ func consoleWriteAnsi(args ...interface{}) {
 	}
 }
 
+// Write a character to the display, using the current colors if able
 func consoleColorAddChar(c rune) {
 	if goncurses.HasColors() {
 		color := goncurses.ColorPair(int16(curBGcolor<<4 | curFGcolor))
@@ -82,10 +103,16 @@ func consoleColorAddChar(c rune) {
 
 // This proceses an ANSI sequence parameter
 func procAnsiParm() {
-	parm, _ := strconv.Atoi(ansiEaten)
-	ansiEaten = ""
-	ansiParms[ansiParmCount] = parm
-	ansiParmCount++
+	if ansiEaten == "" {
+		// No parameter given
+		ansiParmCount++
+	} else {
+		// Should be numeric...
+		parm, _ := strconv.Atoi(ansiEaten)
+		ansiEaten = ""
+		ansiParms[ansiParmCount] = parm
+		ansiParmCount++
+	}
 }
 
 // This sets up default ANSI parameters for a sequence
@@ -186,16 +213,16 @@ func consoleAnsi(c rune) {
 				defAnsiParms(0)
 				ansiEL()
 			case 'L': // IL
-				// FIXME: Not supported by goncurses
+				// FIXME: Insert line not supported by goncurses
 				defAnsiParms(1)
 			case 'M': // DL
-				// FIXME: Not supported by goncurses
+				// FIXME: Delete line not supported by goncurses
 				defAnsiParms(1)
 			case 'P': // DC
 				defAnsiParms(1)
 				ansiDC()
 			case '@': // IC
-				// FIXME: Not supported by goncurses
+				// FIXME: Insert character not supported by goncurses
 				defAnsiParms(1)
 			case 'S': // SU
 				defAnsiParms(1)
@@ -207,13 +234,16 @@ func consoleAnsi(c rune) {
 				ansiSGR()
 			case 'n': // DSR
 				defAnsiParms(6)
-				// TODO
+				ansiDSR()
 			case 'p': // Normal colors
 				consoleWindow.AttrOff(goncurses.A_REVERSE)
 			case 'q': // Inverse colors
 				consoleWindow.AttrOn(goncurses.A_REVERSE)
-			case 's': // Reset display
-				consoleWindow.AttrSet(0)
+			case 's': // Reset display (some sources), save cursor position (ANSI)
+				// consoleWindow.AttrSet(0)
+				savey, savex = consoleWindow.CursorYX()
+			case 'u': // restore cursor position, see comment for 's'
+				consoleWindow.Move(savey, savex)
 			default:
 				// nothing
 			}
@@ -372,7 +402,7 @@ func ansiSGR() {
 		case 39:
 			curFGcolor = 8
 		case 40, 41, 42, 43, 44, 45, 46, 47:
-			curFGcolor = v - 40
+			curBGcolor = v - 40
 		case 49:
 			curBGcolor = 8
 		default:
@@ -380,3 +410,15 @@ func ansiSGR() {
 		}
 	}
 }
+
+func ansiDSR() {
+	switch ansiParms[0] {
+	case 6:
+		curY, curX := consoleWindow.CursorYX()
+		reply := fmt.Sprintf("\x1B[%v;%vR", curY+1, curX+1)
+		for _, b := range []byte(reply) {
+			consoleInputChan <- goncurses.Key(b)
+		}
+	}
+}
+
