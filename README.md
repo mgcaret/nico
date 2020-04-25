@@ -61,19 +61,36 @@ variables set.
 
 ## Operation
 
-``nico <console-device> [<debug-device>]``
+``nico [options] <console-device> [<debug-device>]``
 
 Where the devices are typically serial ports, however may also be
 Unix domain sockets (for development purposes).  Additionally,
 ``console-device`` may be ``test`` which will execute Nico in a
-test/demo mode.
+test/demo mode (and ``debug-device`` is ignored).
 
-Nico will start up quickly and draw the screen, divided by a
+### Options
+
+``-console-baud <rate>``
+
+Set console baud (default 9600)
+
+``-debug-baud <rate>``
+
+Set console baud (default 57600)
+
+``-no-debug``
+
+Disable debug/command interface entirely, leaving the whole screen
+for the console.
+
+### The Nico Interfaces 
+
+Nico will start up quickly and draw the screen.  Unless ``-no-debug``
+was given on the command line, the display is divided by a
 horizontal line.  Above the line is the ANSI terminal interface, which
 is connected to ``console-device``, and below is the debug/command
 interface.  The debug/command interface will be of limited utility if
-``debug-device`` was not specified.  (A future command-line option
-will allow omitting the debug/command interface display, if desired.)
+``debug-device`` was not specified, and ``--no-debug`` will omit it.
 
 The bottom line of the debug/command interface is the command-line
 input.

@@ -127,9 +127,11 @@ func commandLineInput(k goncurses.Key) {
 				r = ""
 			}
 		case 12:
-			debugWindow.Clear()
-			debugWindow.Move(0, 0)
-			debugWindow.Refresh()
+			if debugWindow != nil {
+				debugWindow.Clear()
+				debugWindow.Move(0, 0)
+				debugWindow.Refresh()
+			}
 		case 127, goncurses.KEY_BACKSPACE:
 			if len(l) > 0 {
 				l = l[0 : len(l)-1]
@@ -288,10 +290,12 @@ func keyboardCommand() bool {
 		consoleWindow.Move(0, 0)
 		consoleWindow.Refresh()
 	case 100, 68: // d, D
-		debugWindow.AttrSet(0)
-		debugWindow.Erase()
-		debugWindow.Move(0, 0)
-		debugWindow.Refresh()
+		if debugWindow != nil {
+			debugWindow.AttrSet(0)
+			debugWindow.Erase()
+			debugWindow.Move(0, 0)
+			debugWindow.Refresh()
+		}
 	case 104, 72: // h, H
 		helpText()
 	case 113, 81: // q, Q

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rthornton128/goncurses"
 	"log"
+	"os"
 )
 
 const VERSION = "0.0.1"
@@ -21,15 +22,26 @@ var (
 	consoleIoServicer consoleIoServicerFunc         // Console I/O servicer routine
 	debugInterface debugInterfaceFunc               // Debug I/O servicer routine
 	exitReason string = ""                          // final message for user
+	noDebug = false									// omit debug window if true
 )
+
+func init() {
+	log.Println(
+		"Neon816 Integrated Console -",
+		fmt.Sprintf("nico v%s by Michael Guidero", VERSION))
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s <console-device> [<debug-device>]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.UintVar(&consoleSpeed, "console-baud", 9600, "Set console baud")
+	flag.UintVar(&debugSpeed, "debug-baud", 57600, "Set console baud")
+	flag.BoolVar(&noDebug, "no-debug", false, "Disable debug/command interface")
+	flag.Parse()
+}
 
 // Get everything set up
 func main() {
 	testMode := false
-	log.Println(
-		"Neon816 Integrated Console -",
-		fmt.Sprintf("nico v%s by Michael Guidero", VERSION))
-	flag.Parse()
 	debugInterface = nullDebugInterface
 	if consoleDevice := flag.Arg(0); consoleDevice != "" {
 		if consoleDevice == "test" {
@@ -44,13 +56,17 @@ func main() {
 	if consoleIoServicer == nil {
 		log.Fatal("Invalid or no console device specified!")
 	}
-	if debugDevice := flag.Arg(1); debugDevice != "" {
-		log.Printf("Debug device: %s", debugDevice)
-		debugInterface = getDebugInterface(debugDevice)
-		if debugInterface == nil {
-			debugInterface = nullDebugInterface
-			log.Print("Debug device is not usable")
-			debugOutputChan <- fmt.Sprintf("Debug device %s is not usable!\n", debugDevice)
+	if noDebug {
+		debugInterface = noDebugInterface
+	} else {
+		if debugDevice := flag.Arg(1); debugDevice != "" {
+			log.Printf("Debug device: %s", debugDevice)
+			debugInterface = getDebugInterface(debugDevice)
+			if debugInterface == nil {
+				debugInterface = nullDebugInterface
+				log.Print("Debug device is not usable")
+				debugOutputChan <- fmt.Sprintf("Debug device %s is not usable!\n", debugDevice)
+			}
 		}
 	}
 	src, err := goncurses.Init()
@@ -82,13 +98,19 @@ func main() {
 	if testMode {
 		maxY, maxX := consoleWindow.MaxYX()
 		consoleWindow.Println(fmt.Sprintf("[console %vx%v]", maxX, maxY))
-		maxY, maxX = debugWindow.MaxYX()
-		debugWindow.Println(fmt.Sprintf("[debug %vx%v]", maxX, maxY))
+		if debugWindow != nil {
+			maxY, maxX = debugWindow.MaxYX()
+			debugWindow.Println(fmt.Sprintf("[debug %vx%v]", maxX, maxY))
+		}
 	}
 	consoleWindow.Refresh()
-	debugWindow.Refresh()
+	if debugWindow != nil {
+		debugWindow.Refresh()
+	}
 	commandString = ""
-	commandInputWindow.Refresh()
+	if commandInputWindow != nil {
+		commandInputWindow.Refresh()
+	}
 	// at this point, nobody must make Curses calls outside of uiServicer
 	mainApp()
 	if !goncurses.IsEnd() {
@@ -111,24 +133,28 @@ func mainApp() {
 // Sets up the Curses windows
 func winSetup(src *goncurses.Window) {
 	ysize, xsize := src.MaxYX()
-	wsplit := 25
-	if ysize < 30 {
-		wsplit = ysize - 5
+	if noDebug {
+		consoleWindow = src
+	} else {
+		wsplit := 25
+		if ysize < 30 {
+			wsplit = ysize - 5
+		}
+		src.HLine(wsplit, 0, goncurses.ACS_HLINE, xsize)
+		consoleWindow = src.Derived(wsplit, xsize, 0, 0)
+		debugWindow = src.Derived(ysize-wsplit-2, xsize, wsplit+1, 0)
+		debugWindow.ScrollOk(true)
+		debugWindow.Keypad(true)
+		debugWindow.Timeout(0)
+		commandInputWindow = src.Derived(1, xsize, ysize-1, 0)
+		commandInputWindow.ScrollOk(false)
+		commandInputWindow.Keypad(true)
+		commandInputWindow.Timeout(50)
 	}
-	src.HLine(wsplit, 0, goncurses.ACS_HLINE, xsize)
-	src.Refresh()
-	consoleWindow = src.Derived(wsplit, xsize, 0, 0)
 	consoleWindow.ScrollOk(true)
 	consoleWindow.Keypad(true)
 	consoleWindow.Timeout(50)
-	debugWindow = src.Derived(ysize-wsplit-2, xsize, wsplit+1, 0)
-	debugWindow.ScrollOk(true)
-	debugWindow.Keypad(true)
-	debugWindow.Timeout(0)
-	commandInputWindow = src.Derived(1, xsize, ysize-1, 0)
-	commandInputWindow.ScrollOk(false)
-	commandInputWindow.Keypad(true)
-	commandInputWindow.Timeout(50)
 	activeWindow = consoleWindow
+	src.Refresh()
 }
 
