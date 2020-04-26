@@ -9,6 +9,7 @@ package main
 // http://ascii-table.com/ansi-escape-sequences.php
 // https://en.wikipedia.org/wiki/ANSI_escape_code
 // https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/c327.html
+// https://ispltd.org/mini_howto:ansi_terminal_codes
 // IEEE 1275-1994
 
 
@@ -165,6 +166,12 @@ func consoleAnsi(c rune) {
 			ansiParms = make(map[int]int)
 			ansiParmCount = 0
 			ansiEaten = ""
+		case 'c':
+			ansiState = norm
+			consoleWindow.AttrSet(0)
+			consoleWindow.Erase()
+			consoleWindow.Move(0,0)
+			consoleWindow.Refresh()
 		default:
 			ansiState = norm
 			consoleColorAddChar(0x1B)
@@ -412,13 +419,16 @@ func ansiSGR() {
 }
 
 func ansiDSR() {
+	reply := ""
 	switch ansiParms[0] {
-	case 6:
+	case 5: // Query device status
+		reply = fmt.Sprint("\x1B[0n") // we are always happy
+	case 6: // Query cursor position
 		curY, curX := consoleWindow.CursorYX()
-		reply := fmt.Sprintf("\x1B[%v;%vR", curY+1, curX+1)
-		for _, b := range []byte(reply) {
-			consoleInputChan <- goncurses.Key(b)
-		}
+		reply = fmt.Sprintf("\x1B[%v;%vR", curY+1, curX+1)
+	}
+	for _, b := range []byte(reply) {
+		consoleInputChan <- goncurses.Key(b)
 	}
 }
 
