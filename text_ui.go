@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/rthornton128/goncurses"
+	"github.com/mgcaret/goncurses"
 	"strings"
 )
 

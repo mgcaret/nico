@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rthornton128/goncurses"
+	"github.com/mgcaret/goncurses"
 	"github.com/jacobsa/go-serial/serial"
 	"net"
 	"os"

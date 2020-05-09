@@ -10,9 +10,6 @@ Darwin*)
   fi
   go build
   ;;
-Linux*)
-  go build -ldflags '-w -extldflags "-static"'
-  ;;
 *)
   go build
   ;;

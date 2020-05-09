@@ -15,7 +15,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rthornton128/goncurses"
+	"github.com/mgcaret/goncurses"
 	"strconv"
 	"strings"
 )
@@ -220,17 +220,17 @@ func consoleAnsi(c rune) {
 				defAnsiParms(0)
 				ansiEL()
 			case 'L': // IL
-				// FIXME: Insert line not supported by goncurses
 				defAnsiParms(1)
+				ansiIL()
 			case 'M': // DL
-				// FIXME: Delete line not supported by goncurses
 				defAnsiParms(1)
+				ansiDL()
 			case 'P': // DC
 				defAnsiParms(1)
 				ansiDC()
 			case '@': // IC
-				// FIXME: Insert character not supported by goncurses
 				defAnsiParms(1)
+				ansiIC()
 			case 'S': // SU
 				defAnsiParms(1)
 				ansiSU()
@@ -365,9 +365,25 @@ func ansiSD() {
 	consoleWindow.Scroll(-ansiParms[0])
 }
 
+// delete line
+func ansiDL() {
+	consoleWindow.InsDelLine(-ansiParms[0])
+}
+
+// insert line
+func ansiIL() {
+	consoleWindow.InsDelLine(ansiParms[0])
+}
+
 func ansiDC() {
 	for i := 0; i < ansiParms[0]; i++ {
 		consoleWindow.DelChar()
+	}
+}
+
+func ansiIC() {
+	for i := 0; i < ansiParms[0]; i++ {
+		consoleWindow.InsChar(' ')
 	}
 }
 

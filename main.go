@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/rthornton128/goncurses"
+	"github.com/mgcaret/goncurses"
 	"log"
 	"os"
 )
