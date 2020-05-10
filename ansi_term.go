@@ -12,7 +12,6 @@ package main
 // https://ispltd.org/mini_howto:ansi_terminal_codes
 // IEEE 1275-1994
 
-
 import (
 	"fmt"
 	"github.com/mgcaret/goncurses"
@@ -24,6 +23,9 @@ const (
 	norm = iota
 	csi0
 	csi1
+	vtlp
+	vtrp
+	keep
 )
 
 // foreground color translation
@@ -57,14 +59,16 @@ var colorTransBG = [9]int16{
 }
 
 var (
-	curFGcolor    = 8              // current ANSI foreground color
-	curBGcolor    = 8              // current ANSI background color)
-	ansiState     = norm           // current ANSI state
-	ansiParms     map[int]int      // ANSI escape sequence parameters
-	ansiParmCount int              // ANSI escape parameter count
-	ansiEaten     string      = "" // ANSI parameter accumulated chars
-	savex         = 0			   // Saved cursor position X
-	savey         = 0              // Saved cursor position Y
+	curFGcolor    = 8                 // current ANSI foreground color
+	curBGcolor    = 8                 // current ANSI background color)
+	ansiState     = norm              // current ANSI state
+	ansiParmPfx   rune                // prefix to ANSI parameter
+	ansiParms     map[int]int         // ANSI escape sequence parameters
+	ansiParmCount int                 // ANSI escape parameter count
+	ansiEaten     string      = ""    // ANSI parameter accumulated chars
+	savex                     = 0     // Saved cursor position X
+	savey                     = 0     // Saved cursor position Y
+	vt52                      = false // VT52 mode
 )
 
 // Set up the color mapping from ANSI colors to Curses colors
@@ -161,8 +165,53 @@ func consoleAnsi(c rune) {
 		}
 	case csi0:
 		switch c {
+		case 'A':
+			ansiState = norm
+			ansiParms = map[int]int{
+				0: 1,
+			}
+			ansiCUU()
+		case 'B':
+			ansiState = norm
+			ansiParms = map[int]int{
+				0: 1,
+			}
+			ansiCUD()
+		case 'C':
+			ansiState = norm
+			ansiParms = map[int]int{
+				0: 1,
+			}
+			ansiCUF()
+		case 'D':
+			if vt52 {
+				ansiState = norm
+				ansiParms = map[int]int{
+					0: 1,
+				}
+				ansiCUB()
+			} else {
+				ansiState = norm
+				consoleWindow.Scroll(1)
+			}
+		case 'E':
+			ansiState = norm
+			ansiParms = map[int]int{
+				0: 1,
+			}
+			ansiCNL()
+		case 'M':
+			ansiState = norm
+			consoleWindow.Scroll(1)
+		case '7': // save cursor position and attributes
+			ansiState = norm
+			savey, savex = consoleWindow.CursorYX()
+		case '8': // restore cursor position and attributes
+			ansiState = norm
+			consoleWindow.Move(savey, savex)
 		case '[':
 			ansiState = csi1
+			ansiParmPfx = 0
 			ansiParms = make(map[int]int)
 			ansiParmCount = 0
 			ansiEaten = ""
@@ -170,8 +219,12 @@ func consoleAnsi(c rune) {
 			ansiState = norm
 			consoleWindow.AttrSet(0)
 			consoleWindow.Erase()
-			consoleWindow.Move(0,0)
+			consoleWindow.Move(0, 0)
 			consoleWindow.Refresh()
+		case '(':
+			ansiState = vtlp
+		case ')':
+			ansiState = vtrp
 		default:
 			ansiState = norm
 			consoleColorAddChar(0x1B)
@@ -189,6 +242,9 @@ func consoleAnsi(c rune) {
 				procAnsiParm()
 			}
 			switch c {
+			case '?':
+				ansiParmPfx = c
+				ansiState = keep
 			case 'A': // CUU
 				defAnsiParms(1)
 				ansiCUU()
@@ -237,7 +293,12 @@ func consoleAnsi(c rune) {
 			case 'T': // SD
 				defAnsiParms(1)
 				ansiSD()
+			case 'h':
+				vtSet1()
+			case 'l': // vtSet2
+				vtSet2()
 			case 'm': // SGR
+				defAnsiParms(0)
 				ansiSGR()
 			case 'n': // DSR
 				defAnsiParms(6)
@@ -254,9 +315,17 @@ func consoleAnsi(c rune) {
 			default:
 				// nothing
 			}
-			ansiState = norm
-			consoleWindow.Refresh()
+			if ansiState == keep {
+				ansiState = csi1
+			} else {
+				ansiState = norm
+				consoleWindow.Refresh()
+			}
 		}
+	case vtlp:
+		ansiState = norm
+	case vtrp:
+		ansiState = norm
 	default:
 		ansiState = norm
 		consoleColorAddChar(c)
@@ -392,6 +461,8 @@ func ansiSGR() {
 		switch v {
 		case 0: // All normal
 			consoleWindow.AttrSet(0)
+			curFGcolor = 8
+			curBGcolor = 8
 		case 1: // Bold
 			consoleWindow.AttrOn(goncurses.A_BOLD)
 		case 2: // Faint
@@ -411,6 +482,7 @@ func ansiSGR() {
 		case 21: // Bold off or double underline
 			consoleWindow.AttrOff(goncurses.A_BOLD)
 		case 22: // Normal intensity
+			consoleWindow.AttrOff(goncurses.A_BOLD)
 			consoleWindow.AttrOff(goncurses.A_DIM)
 		case 24: // Underline off
 			consoleWindow.AttrOff(goncurses.A_UNDERLINE)
@@ -448,3 +520,10 @@ func ansiDSR() {
 	}
 }
 
+func vtSet1() {
+	// TODO
+}
+
+func vtSet2() {
+	// TODO
+}
