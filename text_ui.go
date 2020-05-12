@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mgcaret/goncurses"
 	"strings"
+	"time"
 )
 
 var (
@@ -14,22 +15,46 @@ var (
 	commandCursor      = 0               // cursor position in command string
 	consoleWindow      *goncurses.Window // console window
 	activeWindow       *goncurses.Window // current active input window
+	currentFileXfer    *FileXfer         // current active file transfer
 )
 
 // All screen/keyboard I/O is done in this function, to be used as
 // a goroutine, in order to make sure that we don't try to use Curses
 // functions concurrently
+// This function also wedges in the file transfer feature.  Not the best
+// architecture :(
 func uiServicer() {
 	for {
 		select {
 		case s := <-consoleOutputChan:
-			consoleWriteAnsi(s)
+			// from Device to display
+			if currentFileXfer == nil {
+				consoleWriteAnsi(s)
+			} else {
+				for _, b := range []byte(s) {
+					currentFileXfer.FileXferInputChan <- b
+				}
+			}
 		case s := <-debugOutputChan:
 			debugWrite(s)
+			if debugLogger != nil {
+				debugLogger.Print(s)
+			}
 		default:
+			if currentFileXfer != nil {
+				select {
+				case b := <-currentFileXfer.FileXferOutputChan:
+					consoleInputChan <- goncurses.Key(b) // go directly outbound
+				default:
+				}
+			}
 			k := activeWindow.GetChar()
 			if k != 0 {
 				serviceKey(k)
+			} else {
+				if currentFileXfer == nil {
+					time.Sleep(10 * time.Millisecond)
+				}
 			}
 		}
 	}
@@ -85,7 +110,9 @@ func serviceKey(k goncurses.Key) {
 	default:
 		switch activeWindow {
 		case consoleWindow:
-			consoleInputChan <- translateKey(k)
+			if currentFileXfer != nil {
+				consoleInputChan <- translateKey(k)
+			}
 		case commandInputWindow:
 			commandLineInput(k)
 		}
@@ -249,6 +276,53 @@ func processCommandLine(cl string) {
 		return
 	}
 	switch strings.ToLower(words[0]) {
+	case "sx":
+		if currentFileXfer == nil {
+			currentFileXfer = newFileXfer()
+			for _, file := range words[1:] {
+				if file != "" {
+					go func() {
+						err := currentFileXfer.sendFile(pXmodem, file)
+						if err != nil {
+							debugOutputChan <- fmt.Sprintf("File transfer error: %v!\n", err)
+						} else {
+							debugOutputChan <- fmt.Sprint("File transfer complete!\n")
+						}
+						currentFileXfer = nil
+					}()
+					break
+				}
+			}
+		} else {
+			debugOutputChan <- fmt.Sprint("A transfer is already in progress!\n")
+		}
+	case "sb", "sy":
+		if currentFileXfer == nil {
+			currentFileXfer = newFileXfer()
+			for _, file := range words[1:] {
+				if file != "" {
+					go func() {
+						err := currentFileXfer.sendFile(pYmodem, file)
+						if err != nil {
+							debugOutputChan <- fmt.Sprintf("File transfer error: %v!\n", err)
+						} else {
+							debugOutputChan <- fmt.Sprint("File transfer complete!\n")
+						}
+						currentFileXfer = nil
+					}()
+					break
+				}
+			}
+		} else {
+			debugOutputChan <- fmt.Sprint("A transfer is already in progress!\n")
+		}
+	case "cfx":
+		if currentFileXfer != nil {
+			currentFileXfer.Cancel <- true
+			debugOutputChan <- fmt.Sprint("Cancel file transfer...\n")
+		} else {
+			debugOutputChan <- fmt.Sprint("No transfer in progress!\n")
+		}
 	case "quit":
 		quitChan <- ""
 	case "help":

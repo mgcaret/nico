@@ -14,15 +14,17 @@ type consoleIoServicerFunc func()
 type debugInterfaceFunc func()
 
 var (
-	consoleInputChan = make(chan goncurses.Key, 16) // console input channel
-	consoleOutputChan = make(chan string, 16)       // console output channel
-	debugOutputChan = make(chan string, 16)         // console output channel
-	debugCommandChan = make(chan []string, 16)      // debug command channel
-	quitChan = make(chan string, 3)                 // quit channel (non-blocking)
-	consoleIoServicer consoleIoServicerFunc         // Console I/O servicer routine
-	debugInterface debugInterfaceFunc               // Debug I/O servicer routine
-	exitReason string = ""                          // final message for user
-	noDebug = false									// omit debug window if true
+	consoleInputChan  = make(chan goncurses.Key, 16)         // console input channel
+	consoleOutputChan = make(chan string, 16)                // console output channel
+	debugOutputChan   = make(chan string, 16)                // console output channel
+	debugCommandChan  = make(chan []string, 16)              // debug command channel
+	quitChan          = make(chan string, 3)                 // quit channel (non-blocking)
+	consoleIoServicer consoleIoServicerFunc                  // Console I/O servicer routine
+	debugInterface    debugInterfaceFunc                     // Debug I/O servicer routine
+	exitReason        string                         = ""    // final message for user
+	noDebug                                          = false // omit debug window if true
+	debugLog                                         = ""    // debug log output file
+	debugLogger       *log.Logger                            // debug logger
 )
 
 func init() {
@@ -36,11 +38,20 @@ func init() {
 	flag.UintVar(&consoleSpeed, "console-baud", 9600, "Set console baud")
 	flag.UintVar(&debugSpeed, "debug-baud", 57600, "Set console baud")
 	flag.BoolVar(&noDebug, "no-debug", false, "Disable debug/command interface")
+	flag.StringVar(&debugLog, "debug-log", "", "Debug log file")
 	flag.Parse()
 }
 
 // Get everything set up
 func main() {
+	if debugLog != "" {
+		file, err := os.OpenFile(debugLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatal("Unable to open debug log file!")
+		}
+		defer file.Close()
+		debugLogger = log.New(file, "", log.Ldate|log.Ltime)
+	}
 	testMode := false
 	debugInterface = nullDebugInterface
 	if consoleDevice := flag.Arg(0); consoleDevice != "" {
@@ -149,7 +160,7 @@ func winSetup(src *goncurses.Window) {
 		commandInputWindow = src.Derived(1, xsize, ysize-1, 0)
 		commandInputWindow.ScrollOk(false)
 		commandInputWindow.Keypad(true)
-		commandInputWindow.Timeout(50)
+		commandInputWindow.Timeout(0)
 	}
 	consoleWindow.ScrollOk(true)
 	consoleWindow.Keypad(true)
@@ -157,4 +168,3 @@ func winSetup(src *goncurses.Window) {
 	activeWindow = consoleWindow
 	src.Refresh()
 }
-
